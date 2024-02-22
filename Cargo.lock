@@ -6726,6 +6726,7 @@ dependencies = [
  "bcs",
  "clap",
  "codespan-reporting",
+ "dunce",
  "hex",
  "move-binary-format",
  "move-borrow-graph",
