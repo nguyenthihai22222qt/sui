@@ -554,6 +554,8 @@ mod tests {
             .unwrap_err();
     }
 
+    // TODO: enable this test after we replace all env variables with hardcoded IDs
+    #[ignore]
     #[tokio::test]
     async fn test_get_action_onchain_status_for_sui_to_eth_transfer() {
         let mut test_cluster = TestClusterBuilder::new().build().await;
