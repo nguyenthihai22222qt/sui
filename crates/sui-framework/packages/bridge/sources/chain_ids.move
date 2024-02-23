@@ -51,10 +51,16 @@ module bridge::chain_ids {
     }
 
     public fun assert_valid_chain_id(id: u8) {
-        if (id != SuiMainnet && id != SuiTestnet && id != SuiDevnet && id != SuiLocalTest &&
-            id != EthMainnet && id != EthSepolia && id != EthLocalTest) {
-            abort EInvalidBridgeRoute
-        }
+        assert!(
+            id == SuiMainnet ||
+            id == SuiTestnet ||
+            id == SuiDevnet ||
+            id == SuiLocalTest ||
+            id == EthMainnet ||
+            id == EthSepolia ||
+            id == EthLocalTest,
+            EInvalidBridgeRoute
+        )
     }
 
     public fun valid_routes(): vector<BridgeRoute> {

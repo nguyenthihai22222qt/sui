@@ -319,10 +319,16 @@
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="chain_ids.md#0xb_chain_ids_assert_valid_chain_id">assert_valid_chain_id</a>(id: u8) {
-    <b>if</b> (id != <a href="chain_ids.md#0xb_chain_ids_SuiMainnet">SuiMainnet</a> && id != <a href="chain_ids.md#0xb_chain_ids_SuiTestnet">SuiTestnet</a> && id != <a href="chain_ids.md#0xb_chain_ids_SuiDevnet">SuiDevnet</a> && id != <a href="chain_ids.md#0xb_chain_ids_SuiLocalTest">SuiLocalTest</a> &&
-        id != <a href="chain_ids.md#0xb_chain_ids_EthMainnet">EthMainnet</a> && id != <a href="chain_ids.md#0xb_chain_ids_EthSepolia">EthSepolia</a> && id != <a href="chain_ids.md#0xb_chain_ids_EthLocalTest">EthLocalTest</a>) {
-        <b>abort</b> <a href="chain_ids.md#0xb_chain_ids_EInvalidBridgeRoute">EInvalidBridgeRoute</a>
-    }
+    <b>assert</b>!(
+        id == <a href="chain_ids.md#0xb_chain_ids_SuiMainnet">SuiMainnet</a> ||
+        id == <a href="chain_ids.md#0xb_chain_ids_SuiTestnet">SuiTestnet</a> ||
+        id == <a href="chain_ids.md#0xb_chain_ids_SuiDevnet">SuiDevnet</a> ||
+        id == <a href="chain_ids.md#0xb_chain_ids_SuiLocalTest">SuiLocalTest</a> ||
+        id == <a href="chain_ids.md#0xb_chain_ids_EthMainnet">EthMainnet</a> ||
+        id == <a href="chain_ids.md#0xb_chain_ids_EthSepolia">EthSepolia</a> ||
+        id == <a href="chain_ids.md#0xb_chain_ids_EthLocalTest">EthLocalTest</a>,
+        <a href="chain_ids.md#0xb_chain_ids_EInvalidBridgeRoute">EInvalidBridgeRoute</a>
+    )
 }
 </code></pre>
 
@@ -412,11 +418,8 @@
 
 <pre><code><b>public</b> <b>fun</b> <a href="chain_ids.md#0xb_chain_ids_get_route">get_route</a>(source: u8, destination: u8): <a href="chain_ids.md#0xb_chain_ids_BridgeRoute">BridgeRoute</a> {
     <b>let</b> route = <a href="chain_ids.md#0xb_chain_ids_BridgeRoute">BridgeRoute</a> { source, destination };
-    <b>return</b> <b>if</b> (<a href="dependencies/move-stdlib/vector.md#0x1_vector_contains">vector::contains</a>(&<a href="chain_ids.md#0xb_chain_ids_valid_routes">valid_routes</a>(), &route)) {
-        route
-    } <b>else</b> {
-        <b>abort</b> <a href="chain_ids.md#0xb_chain_ids_EInvalidBridgeRoute">EInvalidBridgeRoute</a>
-    }
+    <b>assert</b>!(<a href="dependencies/move-stdlib/vector.md#0x1_vector_contains">vector::contains</a>(&<a href="chain_ids.md#0xb_chain_ids_valid_routes">valid_routes</a>(), &route), <a href="chain_ids.md#0xb_chain_ids_EInvalidBridgeRoute">EInvalidBridgeRoute</a>);
+    route
 }
 </code></pre>
 
