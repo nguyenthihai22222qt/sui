@@ -1053,7 +1053,6 @@ impl<'a> MoveTestAdapter<'a> for SuiTestAdapter<'a> {
                     .unwrap();
 
                 let objects = self.executor.read_objects(tx.clone()).await?;
-                self.next_task();
 
                 // only run benchmarks in release mode
                 if !cfg!(debug_assertions) {
