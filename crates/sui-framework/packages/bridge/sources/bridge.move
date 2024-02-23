@@ -38,6 +38,8 @@ module bridge::bridge {
     use sui::test_utils::{destroy, assert_eq};
     #[test_only]
     use bridge::message::create_blocklist_message;
+    #[test_only]
+    use sui::hex;
 
     const ACCEPTED_MESSAGE_VERSION: u8 = 1;
 
@@ -398,23 +400,22 @@ module bridge::bridge {
         };
     }
 
-    public fun get_token_tranfser_action_status<T>(
+    entry fun get_token_tranfser_action_status(
         self: &mut Bridge,
         source_chain: u8,
         bridge_seq_num: u64,
-        ctx: &mut TxContext
     ): u8 {
         let inner = load_inner_mut(self);
         let key = message::create_key(source_chain, message_types::token(), bridge_seq_num);
         if (!linked_table::contains(&inner.bridge_records, key)) {
-            return TRANSFER_STATUS_NOT_FOUND;
+            return TRANSFER_STATUS_NOT_FOUND
         };
-        let record = linked_table::borrow(&mut inner.bridge_records, key);
+        let record = linked_table::borrow(&inner.bridge_records, key);
         if (record.claimed) {
-            return TRANSFER_STATUS_CLAIMED;
+            return TRANSFER_STATUS_CLAIMED
         };
         if (option::is_some(&record.verified_signatures)) {
-            return TRANSFER_STATUS_READY_FOR_CLAIM;
+            return TRANSFER_STATUS_READY_FOR_CLAIM
         };
         TRANSFER_STATUS_PENDING
     }
@@ -679,41 +680,68 @@ module bridge::bridge {
         let ctx = test_scenario::ctx(&mut scenario);
         let chain_id = chain_ids::sui_devnet();
         let bridge = new_for_testing(ctx, chain_id);
-        let inner = load_inner_mut(&mut bridge);
+        let coin = coin::mint_for_testing<ETH>(12345, ctx);
 
-        let key = message::create_key(chain_id, 0, 11);
-        linked_table::push_back(&mut inner.bridge_records, key, BridgeRecord {
+        // Test when pending
+        let message = message::create_token_bridge_message(
+            chain_ids::sui_devnet(), // source chain
+            10, // seq_num
+            address::to_bytes(tx_context::sender(ctx)), // sender address
+            chain_ids::eth_sepolia(), // target_chain
+            hex::decode(b"00000000000000000000000000000000000000c8"), // target_address
+            1u8, // token_type
+            balance::value(coin::balance(&coin))
+        );        
+
+        let key = message::key(&message);
+        linked_table::push_back(&mut load_inner_mut(&mut bridge).bridge_records, key, BridgeRecord {
             message,
             verified_signatures: none(),
             claimed: false,
         });
+        assert_eq(get_token_tranfser_action_status(&mut bridge, chain_id, 10), TRANSFER_STATUS_PENDING);
 
-        assert_eq(get_token_tranfser_action_status(&mut bridge, chain_id, 11, ctx), TRANSFER_STATUS_PENDING);
+        // Test when ready for claim
+        let message = message::create_token_bridge_message(
+            chain_ids::sui_devnet(), // source chain
+            11, // seq_num
+            address::to_bytes(tx_context::sender(ctx)), // sender address
+            chain_ids::eth_sepolia(), // target_chain
+            hex::decode(b"00000000000000000000000000000000000000c8"), // target_address
+            1u8, // token_type
+            balance::value(coin::balance(&coin))
+        );        
+        let key = message::key(&message);
+        linked_table::push_back(&mut load_inner_mut(&mut bridge).bridge_records, key, BridgeRecord {
+            message,
+            verified_signatures: option::some(vector[]),
+            claimed: false,
+        });
+        assert_eq(get_token_tranfser_action_status(&mut bridge, chain_id, 11), TRANSFER_STATUS_READY_FOR_CLAIM);
 
-        // initially it's unfrozen
-        assert!(!inner.frozen, 0);
-        // freeze it
-        let msg = message::create_emergency_op_message(
-            chain_ids::sui_devnet(),
-            0, // seq num
-            0, // freeze op
-        );
-        let payload = message::extract_emergency_op_payload(&msg);
-        execute_emergency_op(inner, payload);
+        // Test when already claimed
+        let message = message::create_token_bridge_message(
+            chain_ids::sui_devnet(), // source chain
+            12, // seq_num
+            address::to_bytes(tx_context::sender(ctx)), // sender address
+            chain_ids::eth_sepolia(), // target_chain
+            hex::decode(b"00000000000000000000000000000000000000c8"), // target_address
+            1u8, // token_type
+            balance::value(coin::balance(&coin))
+        );        
+        let key = message::key(&message);
+        linked_table::push_back(&mut load_inner_mut(&mut bridge).bridge_records, key, BridgeRecord {
+            message,
+            verified_signatures: option::some(vector[]),
+            claimed: true,
+        });
+        assert_eq(get_token_tranfser_action_status(&mut bridge, chain_id, 12), TRANSFER_STATUS_CLAIMED);
 
-        // should be frozen now
-        assert!(inner.frozen, 0);
-
-        // freeze it again, should abort
-        let msg = message::create_emergency_op_message(
-            chain_ids::sui_devnet(),
-            1, // seq num, this is supposed to be the next seq num but it's not what we test here
-            0, // unfreeze op
-        );
-        let payload = message::extract_emergency_op_payload(&msg);
-        execute_emergency_op(inner, payload);
+        // Test when message not found
+        assert_eq(get_token_tranfser_action_status(&mut bridge, chain_id, 13), TRANSFER_STATUS_NOT_FOUND);
 
         destroy(bridge);
+        coin::burn_for_testing(coin);
         test_scenario::end(scenario);
     }
 }

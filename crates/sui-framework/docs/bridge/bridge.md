@@ -24,6 +24,7 @@
 -  [Function `load_inner`](#0xb_bridge_load_inner)
 -  [Function `claim_token_internal`](#0xb_bridge_claim_token_internal)
 -  [Function `execute_system_message`](#0xb_bridge_execute_system_message)
+-  [Function `get_token_tranfser_action_status`](#0xb_bridge_get_token_tranfser_action_status)
 -  [Function `execute_emergency_op`](#0xb_bridge_execute_emergency_op)
 -  [Function `execute_update_bridge_limit`](#0xb_bridge_execute_update_bridge_limit)
 -  [Function `execute_update_asset_price`](#0xb_bridge_execute_update_asset_price)
@@ -573,6 +574,42 @@
 
 
 
+<a name="0xb_bridge_TRANSFER_STATUS_CLAIMED"></a>
+
+
+
+<pre><code><b>const</b> <a href="bridge.md#0xb_bridge_TRANSFER_STATUS_CLAIMED">TRANSFER_STATUS_CLAIMED</a>: u8 = 2;
+</code></pre>
+
+
+
+<a name="0xb_bridge_TRANSFER_STATUS_NOT_FOUND"></a>
+
+
+
+<pre><code><b>const</b> <a href="bridge.md#0xb_bridge_TRANSFER_STATUS_NOT_FOUND">TRANSFER_STATUS_NOT_FOUND</a>: u8 = 3;
+</code></pre>
+
+
+
+<a name="0xb_bridge_TRANSFER_STATUS_PENDING"></a>
+
+
+
+<pre><code><b>const</b> <a href="bridge.md#0xb_bridge_TRANSFER_STATUS_PENDING">TRANSFER_STATUS_PENDING</a>: u8 = 0;
+</code></pre>
+
+
+
+<a name="0xb_bridge_TRANSFER_STATUS_READY_FOR_CLAIM"></a>
+
+
+
+<pre><code><b>const</b> <a href="bridge.md#0xb_bridge_TRANSFER_STATUS_READY_FOR_CLAIM">TRANSFER_STATUS_READY_FOR_CLAIM</a>: u8 = 1;
+</code></pre>
+
+
+
 <a name="0xb_bridge_UNFREEZE"></a>
 
 
@@ -1011,6 +1048,46 @@
     } <b>else</b> {
         <b>abort</b> <a href="bridge.md#0xb_bridge_EUnexpectedMessageType">EUnexpectedMessageType</a>
     };
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0xb_bridge_get_token_tranfser_action_status"></a>
+
+## Function `get_token_tranfser_action_status`
+
+
+
+<pre><code>entry <b>fun</b> <a href="bridge.md#0xb_bridge_get_token_tranfser_action_status">get_token_tranfser_action_status</a>(self: &<b>mut</b> <a href="bridge.md#0xb_bridge_Bridge">bridge::Bridge</a>, source_chain: u8, bridge_seq_num: u64): u8
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="bridge.md#0xb_bridge_get_token_tranfser_action_status">get_token_tranfser_action_status</a>(
+    self: &<b>mut</b> <a href="bridge.md#0xb_bridge_Bridge">Bridge</a>,
+    source_chain: u8,
+    bridge_seq_num: u64,
+): u8 {
+    <b>let</b> inner = <a href="bridge.md#0xb_bridge_load_inner_mut">load_inner_mut</a>(self);
+    <b>let</b> key = <a href="message.md#0xb_message_create_key">message::create_key</a>(source_chain, <a href="message_types.md#0xb_message_types_token">message_types::token</a>(), bridge_seq_num);
+    <b>if</b> (!<a href="dependencies/sui-framework/linked_table.md#0x2_linked_table_contains">linked_table::contains</a>(&inner.bridge_records, key)) {
+        <b>return</b> <a href="bridge.md#0xb_bridge_TRANSFER_STATUS_NOT_FOUND">TRANSFER_STATUS_NOT_FOUND</a>
+    };
+    <b>let</b> record = <a href="dependencies/sui-framework/linked_table.md#0x2_linked_table_borrow">linked_table::borrow</a>(&inner.bridge_records, key);
+    <b>if</b> (record.claimed) {
+        <b>return</b> <a href="bridge.md#0xb_bridge_TRANSFER_STATUS_CLAIMED">TRANSFER_STATUS_CLAIMED</a>
+    };
+    <b>if</b> (<a href="dependencies/move-stdlib/option.md#0x1_option_is_some">option::is_some</a>(&record.verified_signatures)) {
+        <b>return</b> <a href="bridge.md#0xb_bridge_TRANSFER_STATUS_READY_FOR_CLAIM">TRANSFER_STATUS_READY_FOR_CLAIM</a>
+    };
+    <a href="bridge.md#0xb_bridge_TRANSFER_STATUS_PENDING">TRANSFER_STATUS_PENDING</a>
 }
 </code></pre>
 

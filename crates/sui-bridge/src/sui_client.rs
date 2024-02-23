@@ -11,6 +11,12 @@ use fastcrypto::traits::KeyPair;
 use fastcrypto::traits::ToFromBytes;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
+use sui_types::transaction::Argument;
+use sui_types::transaction::CallArg;
+use sui_types::transaction::Command;
+use sui_types::transaction::ProgrammableMoveCall;
+use sui_types::transaction::ProgrammableTransaction;
+use sui_types::transaction::TransactionKind;
 use std::str::from_utf8;
 use std::str::FromStr;
 use std::time::Duration;
@@ -50,6 +56,7 @@ use sui_types::{
     event::EventID,
     Identifier,
 };
+use sui_json_rpc_types::sui_transaction::DevInspectResults;
 use tap::TapFallible;
 use tokio_retry::strategy::{jitter, ExponentialBackoff};
 use tokio_retry::Retry;
@@ -323,9 +330,35 @@ impl SuiClientInner for SuiSdkClient {
 
     async fn get_token_transfer_action_onchain_status(
         &self,
-        bridge_records_id: ObjectID,
+        bridge_object_arg: ObjectArg,
+        // bridge_records_id: ObjectID,
         action: &BridgeAction,
     ) -> Result<BridgeActionStatus, BridgeError> {
+        let pt = ProgrammableTransaction {
+            inputs: vec![
+                CallArg::Object(bridge_object_arg),
+                CallArg::Pure(bcs::to_bytes(&(action.chain_id() as u8)).unwrap()),
+                CallArg::Pure(bcs::to_bytes(&(action.seq_number() as u64)).unwrap()),
+            ],
+            commands: vec![Command::MoveCall(Box::new(ProgrammableMoveCall {
+                package: BRIDGE_PACKAGE_ID,
+                module: Identifier::new("bridge").unwrap(),
+                function: Identifier::new("get_token_tranfser_action_status").unwrap(),
+                type_arguments: vec![],
+                arguments: vec![Argument::Input(0), Argument::Input(1), Argument::Input(2)],
+            }))],
+        };
+        let kind = TransactionKind::programmable(pt.clone());
+        let DevInspectResults { results, .. } = self.read_api().dev_inspect_transaction_block(
+            SuiAddress::ZERO, 
+            kind,
+            None,
+            None,
+            None,
+        );
+
+        assert_eq!(effects.status(), &SuiExecutionStatus::Success);
+
         match &action {
             BridgeAction::SuiToEthBridgeAction(_) | BridgeAction::EthToSuiBridgeAction(_) => (),
             _ => return Err(BridgeError::ActionIsNotTokenTransferAction),
