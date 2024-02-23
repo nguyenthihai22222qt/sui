@@ -65,6 +65,13 @@ module bridge::bridge {
     const FREEZE: u8 = 0;
     const UNFREEZE: u8 = 1;
 
+    // Transfer Status
+    const TRANSFER_STATUS_PENDING: u8 = 0;
+    // Is this confusing when the bridge limit is hit?
+    const TRANSFER_STATUS_READY_FOR_CLAIM: u8 = 1;
+    const TRANSFER_STATUS_CLAIMED: u8 = 2;
+    const TRANSFER_STATUS_NOT_FOUND: u8 = 3;
+
     struct TokenBridgeEvent has copy, drop {
         // TODO: do we need message_type here?
         message_type: u8,
@@ -391,6 +398,27 @@ module bridge::bridge {
         };
     }
 
+    public fun get_token_tranfser_action_status<T>(
+        self: &mut Bridge,
+        source_chain: u8,
+        bridge_seq_num: u64,
+        ctx: &mut TxContext
+    ): u8 {
+        let inner = load_inner_mut(self);
+        let key = message::create_key(source_chain, message_types::token(), bridge_seq_num);
+        if (!linked_table::contains(&inner.bridge_records, key)) {
+            return TRANSFER_STATUS_NOT_FOUND;
+        };
+        let record = linked_table::borrow(&mut inner.bridge_records, key);
+        if (record.claimed) {
+            return TRANSFER_STATUS_CLAIMED;
+        };
+        if (option::is_some(&record.verified_signatures)) {
+            return TRANSFER_STATUS_READY_FOR_CLAIM;
+        };
+        TRANSFER_STATUS_PENDING
+    }
+
     fun execute_emergency_op(inner: &mut BridgeInner, payload: EmergencyOp) {
         let op = message::emergency_op_type(&payload);
         if (op == FREEZE) {
@@ -543,7 +571,6 @@ module bridge::bridge {
         test_scenario::end(scenario);
     }
 
-
     #[test]
     fun test_execute_emergency_op() {
         let scenario = test_scenario::begin(@0x0);
@@ -644,4 +671,49 @@ module bridge::bridge {
 
 
     // TODO: Add tests for execute_system_message, including message validation and effects check
+
+
+    #[test]
+    fun test_get_token_transfer_action_status() {
+        let scenario = test_scenario::begin(@0x0);
+        let ctx = test_scenario::ctx(&mut scenario);
+        let chain_id = chain_ids::sui_devnet();
+        let bridge = new_for_testing(ctx, chain_id);
+        let inner = load_inner_mut(&mut bridge);
+
+        let key = message::create_key(chain_id, 0, 11);
+        linked_table::push_back(&mut inner.bridge_records, key, BridgeRecord {
+            message,
+            verified_signatures: none(),
+            claimed: false,
+        });
+
+        assert_eq(get_token_tranfser_action_status(&mut bridge, chain_id, 11, ctx), TRANSFER_STATUS_PENDING);
+
+        // initially it's unfrozen
+        assert!(!inner.frozen, 0);
+        // freeze it
+        let msg = message::create_emergency_op_message(
+            chain_ids::sui_devnet(),
+            0, // seq num
+            0, // freeze op
+        );
+        let payload = message::extract_emergency_op_payload(&msg);
+        execute_emergency_op(inner, payload);
+
+        // should be frozen now
+        assert!(inner.frozen, 0);
+
+        // freeze it again, should abort
+        let msg = message::create_emergency_op_message(
+            chain_ids::sui_devnet(),
+            1, // seq num, this is supposed to be the next seq num but it's not what we test here
+            0, // unfreeze op
+        );
+        let payload = message::extract_emergency_op_payload(&msg);
+        execute_emergency_op(inner, payload);
+
+        destroy(bridge);
+        test_scenario::end(scenario);
+    }
 }
