@@ -231,7 +231,7 @@ pub struct MoveTypeBridgeCommittee {
 }
 
 #[serde_as]
-#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct BridgeCommitteeSummary {
     pub members: Vec<(Vec<u8>, MoveTypeCommitteeMember)>,
@@ -240,7 +240,7 @@ pub struct BridgeCommitteeSummary {
 
 /// Rust version of the Move committee::CommitteeMember type.
 #[serde_as]
-#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveTypeCommitteeMember {
     pub sui_address: SuiAddress,
